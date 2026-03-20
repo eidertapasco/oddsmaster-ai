@@ -81,7 +81,7 @@ async def alertas(update: Update, context: ContextTypes.DEFAULT_TYPE):
     CHAT_IDS_ACTIVOS.add(chat_id)
     await update.message.reply_text(
         "🔔 Alertas activadas\n\n"
-        f"El scanner revisará partidos cada 15 minutos.\n"
+        f"El scanner revisará partidos cada hora.\n"
         f"Te avisaré cuando encuentre una value bet con edge > 8%.\n\n"
         f"Chat ID registrado: {chat_id}"
     )
@@ -119,11 +119,22 @@ async def job_scanner(context):
     
 # Mostrar todos los partidos 
 async def partidos(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("⏳ Consultando partidos en tiempo real...")
+    await update.message.reply_text("⏳ Consultando partidos...")
     logger.info(f"/partidos solicitado por {update.effective_user.first_name}")
-    todos = obtener_todos_los_partidos_hoy()
-    mensaje = formatear_lista_partidos(todos)
-    await update.message.reply_text(mensaje, parse_mode="Markdown")
+
+    from api_client import obtener_todos_los_partidos_completo
+    todos = obtener_todos_los_partidos_completo()
+
+    # Combinamos vivo + programados para el mensaje
+    basketball = todos["basketball_vivo"] + todos["basketball_programados"]
+    tenis      = todos["tenis_vivo"]
+
+    from formatter import formatear_lista_partidos
+    mensaje = formatear_lista_partidos({
+        "basketball": basketball,
+        "tenis":      tenis
+    })
+    await update.message.reply_text(mensaje)
     
 # NBA
 async def nba(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -328,7 +339,7 @@ async def estado(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"✅ APIs deportivas: Conectadas\n"
         f"✅ Motor ELO: Activo\n"
         f"✅ Agente IA (Gemini): Activo\n"
-        f"✅ Scanner automático: cada 15 min\n"
+        f"✅ Scanner automático: cada hora\n"
         f"✅ Alertas: {len(CHAT_IDS_ACTIVOS)} usuario(s) registrado(s)\n\n"
         f"💾 Caché activa: {info_cache['claves_activas']} clave(s)\n"
         f"{'─' * 22}\n"
@@ -381,7 +392,7 @@ def main():
     )
     
     print("🚀 OddsMaster AI v3 — Scanner automático activo")
-    print(f"   Scanner: cada 15 minutos")
+    print(f"   Scanner: cada hora")
     print(f"   Umbral de alerta: edge > 8%")
     app.run_polling()
     

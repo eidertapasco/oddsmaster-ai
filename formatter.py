@@ -35,29 +35,40 @@ def formatear_partido(partido: dict) -> str:
             f"   🏆 {liga}\n"
         )
 
-
 def formatear_lista_partidos(todos: dict) -> str:
-    hoy = date.today().strftime("%d/%m/%Y")
-    mensaje = f"📅 *Partidos del {hoy}*\n\n"
+    from datetime import date
+    hoy     = date.today().strftime("%d/%m/%Y")
+    mensaje = f"📅 Partidos del {hoy}\n\n"
 
     basketball = todos.get("basketball", [])
     if basketball:
-        mensaje += "🏀 *NBA — EN VIVO*\n─────────────────\n"
-        for p in basketball:
-            mensaje += formatear_partido(p)
+        en_vivo     = [p for p in basketball if p.get("en_vivo")]
+        programados = [p for p in basketball if p.get("programado")]
+
+        mensaje += "🏀 NBA\n"
+        if en_vivo:
+            mensaje += "─── En vivo ───\n"
+            for p in en_vivo:
+                mensaje += (
+                    f"🔴 {p['local']} vs {p['visitante']}\n"
+                    f"   {p.get('puntos_local','-')} - {p.get('puntos_visitante','-')}\n"
+                )
+        if programados:
+            mensaje += "─── Programados ───\n"
+            for p in programados:
+                mensaje += f"📅 {p['local']} vs {p['visitante']} — {p.get('hora','')}\n"
         mensaje += "\n"
     else:
-        mensaje += "🏀 *NBA*\nNo hay partidos NBA en vivo ahora\n\n"
+        mensaje += "🏀 NBA\nNo hay partidos hoy\n\n"
 
     tenis = todos.get("tenis", [])
     if tenis:
-        mensaje += "🎾 *TENIS — EN VIVO*\n─────────────────\n"
+        mensaje += "🎾 TENIS — En vivo\n─────────────────\n"
         for p in tenis[:8]:
-            mensaje += formatear_partido(p)
+            mensaje += f"🔴 {p['local']} vs {p['visitante']} — {p.get('liga','')}\n"
     else:
-        mensaje += "🎾 *TENIS*\nNo hay partidos en vivo ahora\n"
+        mensaje += "🎾 TENIS\nNo hay partidos en vivo ahora\n"
 
-    mensaje += "\n_Solo muestra partidos en vivo · OddsMaster AI_"
     return mensaje
 
 
