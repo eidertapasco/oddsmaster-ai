@@ -1,0 +1,7 @@
+# Archivo con claves secretas
+.env
+# Entorno virtual
+venv/
+#py_cache
+__pycache__
+*.pyc
