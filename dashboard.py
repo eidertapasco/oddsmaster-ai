@@ -91,113 +91,49 @@ tab_basket, tab_tenis, tab_analizar = st.tabs([
 
 # ── TAB BALONCESTO ───────────────────────────────────────
 with tab_basket:
-    if not todos_basketball:
-        st.info("No hay partidos de baloncesto disponibles ahora")
-    else:
-        # Construimos tabla con pandas
-        filas = []
-        for p in todos_basketball:
-            estado_icon = "🔴" if p.get("en_vivo", True) else "📅"
+    datos    = cargar_partidos()
+    
+    basket_vivo        = datos["basketball_vivo"]
+    basket_programados = datos["basketball_programados"]
+    todos_basketball   = basket_vivo + basket_programados
 
-            # Buscamos cuotas reales
+    # Métricas
+    col1, col2 = st.columns(2)
+    col1.metric("🔴 En vivo",     len(basket_vivo))
+    col2.metric("📅 Programados", len(basket_programados))
+
+    # Partidos en vivo
+    if basket_vivo:
+        st.subheader("🔴 En vivo ahora")
+        filas_vivo = []
+        for p in basket_vivo:
             c = buscar_cuotas_partido(p["local"], p["visitante"], cuotas)
-            cuota_l = c["local"]     if c else "N/A"
-            cuota_v = c["visitante"] if c else "N/A"
-
-            filas.append({
-                "Estado":     estado_icon,
-                "Local":      p["local"],
-                "Visitante":  p["visitante"],
-                "Marcador":   f"{p.get('puntos_local','-')} - {p.get('puntos_visitante','-')}",
-                "Cuota L":    cuota_l,
-                "Cuota V":    cuota_v,
-                "Liga":       p.get("liga", "NBA")
+            filas_vivo.append({
+                "Local":     p["local"],
+                "Visitante": p["visitante"],
+                "Marcador":  f"{p.get('puntos_local','-')} - {p.get('puntos_visitante','-')}",
+                "Cuota L":   c["local"]     if c else "N/A",
+                "Cuota V":   c["visitante"] if c else "N/A",
             })
+        st.dataframe(pd.DataFrame(filas_vivo), use_container_width=True, hide_index=True)
 
-        df = pd.DataFrame(filas)
-        st.dataframe(df, use_container_width=True, hide_index=True)
+    # Partidos programados
+    if basket_programados:
+        st.subheader("📅 Programados hoy")
+        filas_prog = []
+        for p in basket_programados:
+            c = buscar_cuotas_partido(p["local"], p["visitante"], cuotas)
+            filas_prog.append({
+                "Hora (ET)": p.get("hora", ""),
+                "Local":     p["local"],
+                "Visitante": p["visitante"],
+                "Cuota L":   c["local"]     if c else "N/A",
+                "Cuota V":   c["visitante"] if c else "N/A",
+            })
+        st.dataframe(pd.DataFrame(filas_prog), use_container_width=True, hide_index=True)
 
-        # Selector de partido para analizar
-        st.subheader("Seleccionar partido para analizar")
-        opciones = [f"{p['local']} vs {p['visitante']}" for p in todos_basketball]
-        seleccion = st.selectbox("Partido", opciones, key="sel_basket")
-
-        idx = opciones.index(seleccion)
-        partido_sel = todos_basketball[idx]
-
-        # Cuotas — reales si hay, manuales si no
-        cuotas_reales = buscar_cuotas_partido(
-            partido_sel["local"],
-            partido_sel["visitante"],
-            cuotas
-        )
-
-        col_a, col_b = st.columns(2)
-        with col_a:
-            cuota_local_input = st.number_input(
-                f"Cuota {partido_sel['local']}",
-                min_value=1.01,
-                max_value=50.0,
-                value=float(cuotas_reales["local"]) if cuotas_reales else 2.0,
-                step=0.05,
-                key="cuota_l_basket"
-            )
-        with col_b:
-            cuota_vis_input = st.number_input(
-                f"Cuota {partido_sel['visitante']}",
-                min_value=1.01,
-                max_value=50.0,
-                value=float(cuotas_reales["visitante"]) if cuotas_reales else 2.0,
-                step=0.05,
-                key="cuota_v_basket"
-            )
-
-        if st.button("🔍 Analizar este partido", key="btn_basket"):
-            with st.spinner("Calculando análisis ELO..."):
-                analisis = analizar_partido(
-                    nombre_local=partido_sel["local"],
-                    nombre_visitante=partido_sel["visitante"],
-                    cuota_local=cuota_local_input,
-                    cuota_visitante=cuota_vis_input,
-                    deporte="basketball",
-                    bankroll=bankroll
-                )
-
-            # Mostramos resultados
-            st.subheader("📊 Análisis ELO")
-            c1, c2 = st.columns(2)
-            c1.metric(
-                partido_sel["local"],
-                f"{analisis['prob_local']}%",
-                f"cuota {analisis['cuota_local']}"
-            )
-            c2.metric(
-                partido_sel["visitante"],
-                f"{analisis['prob_visitante']}%",
-                f"cuota {analisis['cuota_visitante']}"
-            )
-
-            if analisis["hay_valor"]:
-                for vb in analisis["value_bets"]:
-                    if vb["valor"] * 100 >= umbral_edge:
-                        st.success(
-                            f"💰 VALUE BET: **{vb['equipo']}** | "
-                            f"Edge: **+{round(vb['valor']*100,1)}%** | "
-                            f"Kelly: **${vb['kelly']}** de ${bankroll}"
-                        )
-                    else:
-                        st.warning(
-                            f"⚠️ Edge débil: {vb['equipo']} "
-                            f"+{round(vb['valor']*100,1)}% (bajo umbral)"
-                        )
-            else:
-                st.error("❌ Sin value bet en este partido")
-
-            if usar_ia:
-                with st.spinner("Consultando agente IA..."):
-                    respuesta_ia = consultar_agente(analisis)
-                st.subheader("🤖 Análisis del Agente IA")
-                st.text(respuesta_ia["texto"])
+    if not basket_vivo and not basket_programados:
+        st.info("No hay partidos NBA hoy")
 
 
 # ── TAB TENIS ────────────────────────────────────────────

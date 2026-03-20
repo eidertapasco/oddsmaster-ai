@@ -88,30 +88,32 @@ async def alertas(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
 # 5. LA FUNCIÓN QUE EJECUTA EL JOB — esta la llama JobQueue automáticamente
 async def job_scanner(context):
-    """
-    Esta función la ejecuta JobQueue cada X minutos.
-    'context' aquí es diferente — es el contexto del Job, no del usuario.
-    context.bot nos permite enviar mensajes proactivamente.
-    """
+    from datetime import datetime
+    hora_actual = datetime.now().hour
+
+    # Solo escanear entre 8am y 11pm (hora Colombia = UTC-5)
+    # Railway corre en UTC, Colombia es UTC-5
+    # 8am Colombia = 13:00 UTC / 11pm Colombia = 4:00 UTC
+    hora_utc = hora_actual
+    hora_colombia = (hora_utc - 5) % 24
+
+    if not (8 <= hora_colombia <= 23):
+        logger.info(f"Scanner pausado — hora Colombia: {hora_colombia}:00")
+        return
+
     if not CHAT_IDS_ACTIVOS:
         logger.info("Scanner: no hay usuarios registrados")
         return
 
-    logger.info("JobQueue: ejecutando scanner...")
+    logger.info(f"JobQueue ejecutando — hora Colombia: {hora_colombia}:00")
 
     try:
         alertas_encontradas = escanear_value_bets()
-
         for alerta in alertas_encontradas:
             mensaje = formatear_alerta(alerta)
-            # Enviamos a todos los usuarios registrados
             for chat_id in CHAT_IDS_ACTIVOS:
-                await context.bot.send_message(
-                    chat_id=chat_id,
-                    text=mensaje
-                )
+                await context.bot.send_message(chat_id=chat_id, text=mensaje)
                 logger.info(f"Alerta enviada a {chat_id}: {alerta['partido']}")
-
     except Exception as e:
         logger.error(f"Error en job_scanner: {e}")
     
@@ -142,16 +144,20 @@ async def tenis(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Analizar partidos
 async def analizar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args
-    if len(args) != 4:
+
+    if len(args) not in [4, 5]:
         await update.message.reply_text(
             "⚠️ Uso correcto:\n"
-            "/analizar [local] [visitante] [cuota_local] [cuota_visitante]\n\n"
-            "Ejemplo:\n"
-            "/analizar Lakers Nuggets 2.10 1.80"
+            "/analizar [local] [visitante] [cuota_l] [cuota_v]\n"
+            "/analizar [local] [visitante] [cuota_l] [cuota_v] [deporte]\n\n"
+            "Ejemplos:\n"
+            "/analizar Lakers Nuggets 2.10 1.80\n"
+            "/analizar Sinner Alcaraz 1.90 1.95 tenis"
         )
         return
 
     try:
+        # Definimos UNA sola vez — sin duplicados
         local     = args[0].replace("-", " ")
         visitante = args[1].replace("-", " ")
         cuota_l   = float(args[2])
@@ -161,15 +167,23 @@ async def analizar(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ Las cuotas deben ser mayores a 1.01")
             return
 
+        # Detectamos deporte UNA sola vez — sin sobreescribir
+        if len(args) == 5:
+            deporte = args[4].lower()
+            if deporte not in ["basketball", "tenis"]:
+                await update.message.reply_text("❌ Deporte debe ser 'basketball' o 'tenis'")
+                return
+        else:
+            deportes_tenis = ["sinner", "alcaraz", "djokovic", "nadal",
+                             "federer", "medvedev", "zverev", "swiatek",
+                             "fritz", "ruud", "rublev", "hurkacz", "paul",
+                             "shelton", "tiafoe", "tsitsipas", "auger"]
+            deporte = "tenis" if any(
+                t in local.lower() or t in visitante.lower()
+                for t in deportes_tenis
+            ) else "basketball"
+
         await update.message.reply_text("🔄 Calculando análisis ELO...")
-
-        deportes_tenis = ["sinner", "alcaraz", "djokovic", "nadal",
-                         "federer", "medvedev", "zverev", "swiatek"]
-        deporte = "tenis" if any(
-            t in local.lower() or t in visitante.lower()
-            for t in deportes_tenis
-        ) else "basketball"
-
 
         # Paso 1: ELO
         analisis_elo = analizar_partido(
@@ -180,7 +194,6 @@ async def analizar(update: Update, context: ContextTypes.DEFAULT_TYPE):
             deporte=deporte
         )
 
-        # Enviamos ELO inmediatamente — sin esperar a Gemini
         await update.message.reply_text(formatear_solo_elo(analisis_elo))
 
         # Paso 2: Gemini
@@ -199,7 +212,6 @@ async def analizar(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "texto": "⚠️ Agente IA tardó demasiado."
             }
 
-        # Enviamos IA en mensajes separados si es largo
         texto_ia = formatear_solo_ia(respuesta_ia["texto"], respuesta_ia["exito"])
         for i in range(0, len(texto_ia), 3800):
             await update.message.reply_text(texto_ia[i:i+3800])
@@ -364,7 +376,7 @@ def main():
     # first=30 → primera ejecución a los 30 segundos de iniciar
     app.job_queue.run_repeating(
         callback=job_scanner,
-        interval=900,   # 900 segundos = 15 minutos
+        interval=3600,   # 1 hora
         first=30
     )
     

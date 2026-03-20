@@ -112,7 +112,7 @@ def obtener_partidos_basketball_hoy() -> list[dict]:
         })
         
     # Guardamos en caché por 5 minutos
-    guardar("basketball_hoy", partidos_formateados, ttl_segundos=300)
+    guardar("basketball_hoy", partidos_formateados, ttl_segundos=1800)
     logger.info(f"Basketball: {len(partidos_formateados)} partidos (API real)")
     return partidos_formateados
 
@@ -151,64 +151,19 @@ def obtener_partidos_tenis_hoy() -> list[dict]:
             "deporte":          "🎾"
         })
     
-    guardar("tenis_hoy", partidos_formateados, ttl_segundos=300)
+    guardar("tenis_hoy", partidos_formateados, ttl_segundos=1800)
     logger.info(f"Tenis: {len(partidos_formateados)} partidos (API real)")
     return partidos_formateados
 
 # api_client.py — agrega estas dos funciones nuevas
 
 def obtener_partidos_basketball_programados() -> list[dict]:
-    """Partidos NBA programados para hoy que aún no empezaron"""
-    from datetime import date
-    hoy = date.today().strftime("%Y-%m-%d")
-
-    cached = obtener("basketball_programados")
-    if cached is not None:
-        return cached
-
-    # REcodeX usa fecha en la ruta para partidos programados
-    datos = hacer_peticion(
-        url=f"https://{BASKETBALL_HOST}/api/basketball/matches/{hoy}",
-        host=BASKETBALL_HOST
-    )
-
-    if not datos or "events" not in datos:
-        # Intentamos ruta alternativa
-        datos = hacer_peticion(
-            url=f"https://{BASKETBALL_HOST}/api/basketball/matches/scheduled/{hoy}",
-            host=BASKETBALL_HOST
-        )
-
-    if not datos or "events" not in datos:
-        logger.warning("Basketball programados: sin datos")
-        return []
-
-    partidos = []
-    for evento in datos["events"]:
-        liga   = evento.get("tournament", {}).get("name", "")
-        estado = evento.get("status", {}).get("description", "")
-
-        if "NBA G League" in liga or "NBA" not in liga:
-            continue
-
-        # Solo los que NO han empezado
-        if any(s in estado.lower() for s in ["progress", "ended", "finished"]):
-            continue
-
-        partidos.append({
-            "id":        evento.get("id", ""),
-            "local":     evento.get("homeTeam", {}).get("name", "Desconocido"),
-            "visitante": evento.get("awayTeam", {}).get("name", "Desconocido"),
-            "estado":    estado,
-            "hora":      evento.get("startTimestamp", ""),
-            "liga":      liga,
-            "deporte":   "🏀",
-            "en_vivo":   False
-        })
-
-    guardar("basketball_programados", partidos, ttl_segundos=300)
-    logger.info(f"Basketball programados: {len(partidos)} partidos")
-    return partidos
+    """Usa nba_api oficial en vez de REcodeX que no tiene este endpoint"""
+    
+    from nba_schedule import obtener_partidos_nba_hoy
+    todos = obtener_partidos_nba_hoy()
+    
+    return [p for p in todos if p.get("programado", False)]
 
 
 def obtener_partidos_tenis_programados() -> list[dict]:
@@ -252,21 +207,20 @@ def obtener_partidos_tenis_programados() -> list[dict]:
             "en_vivo":   False
         })
 
-    guardar("tenis_programados", partidos, ttl_segundos=300)
+    guardar("tenis_programados", partidos, ttl_segundos=1800)
     logger.info(f"Tenis programados: {len(partidos)} partidos")
     return partidos
 
 
 def obtener_todos_los_partidos_completo() -> dict:
-    """
-    Versión completa — en vivo + programados.
-    Esta es la función que usará Streamlit.
-    """
+    from nba_schedule import obtener_nba_completo
+    nba = obtener_nba_completo()
     return {
-        "basketball_vivo":        obtener_partidos_basketball_hoy(),
-        "basketball_programados": obtener_partidos_basketball_programados(),
+        "basketball_vivo":        nba["en_vivo"],
+        "basketball_programados": nba["programados"],
+        "basketball_finalizados": nba["finalizados"],
         "tenis_vivo":             obtener_partidos_tenis_hoy(),
-        "tenis_programados":      obtener_partidos_tenis_programados()
+        "tenis_programados":      []  # REcodeX no lo soporta
     }
 
 
