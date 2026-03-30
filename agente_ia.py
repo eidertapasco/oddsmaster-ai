@@ -25,39 +25,61 @@ def _construir_prompt_basketball(analisis_elo: dict) -> str:
         f"Edge {local}: {valor_l}% | Edge {visitante}: {valor_v}%"
         if hay_valor else "Sin edge estadístico detectado"
     )
+    
+    en_vivo = analisis_elo.get("en_vivo", False)
+    if en_vivo:
+        pts_l   = analisis_elo.get("puntos_local", "-")
+        pts_v   = analisis_elo.get("puntos_visitante", "-")
+        periodo = analisis_elo.get("periodo", 0)
+        try:
+            diferencia = abs(int(pts_l) - int(pts_v))
+            diff_texto = f"{diferencia} puntos de diferencia"
+        except:
+            diff_texto = "diferencia no disponible"
+
+        contexto_vivo = (
+            f"\nPARTIDO EN CURSO — MARCADOR ACTUAL:\n"
+            f"- {local}: {pts_l} puntos\n"
+            f"- {visitante}: {pts_v} puntos\n"
+            f"- Período actual: {periodo}\n"
+            f"- {diff_texto}\n\n"
+            f"IMPORTANTE: El marcador actual es MÁS RELEVANTE que el modelo ELO.\n"
+            f"Una ventaja de 15+ puntos en el 3er o 4to período es casi definitiva.\n"
+            f"Las cuotas en vivo ya reflejan el marcador — tenlo en cuenta al evaluar el edge.\n"
+        )
+    else:
+        contexto_vivo = "Partido aún no iniciado — análisis pre-partido.\n"
 
     return f"""
-Eres un analista experto en apuestas deportivas de valor (value betting) en NBA.
-Tu análisis debe ser preciso, basado en hechos recientes y accionable.
+Eres un analista deportivo experto en NBA.
 
-PARTIDO A ANALIZAR:
-- Local: {local}
-- Visitante: {visitante}
-
-ANÁLISIS ESTADÍSTICO (modelo ELO):
+PARTIDO: {local} vs {visitante}
+{contexto_vivo}
+DATOS DEL MODELO PREDICTIVO:
 - Probabilidad {local}: {prob_local}%
 - Probabilidad {visitante}: {prob_vis}%
-- Cuota {local}: {cuota_l} (implica {round(100/cuota_l, 1)}%)
-- Cuota {visitante}: {cuota_v} (implica {round(100/cuota_v, 1)}%)
+- Cuota de mercado {local}: {cuota_l} (mercado estima {round(100/cuota_l,1)}%)
+- Cuota de mercado {visitante}: {cuota_v} (mercado estima {round(100/cuota_v,1)}%)
 - {resumen_elo}
 
-TU TAREA — responde EXACTAMENTE en este formato:
+Genera un informe con este formato exacto:
 
 CONTEXTO RECIENTE:
-[2-3 hechos concretos sobre forma reciente, lesiones o noticias clave
-de ambos equipos en los últimos 7 días.]
+[2-3 hechos relevantes. Si el partido está en curso, comenta
+el desarrollo actual y si el marcador tiene sentido.]
 
 FACTORES CLAVE:
-[El factor más importante que CONFIRMA o INVALIDA el edge estadístico.
-Máximo 2 oraciones.]
+[El factor más importante. Si hay partido en vivo, el marcador
+actual debe ser el factor principal de tu análisis.]
 
-VEREDICTO FINAL:
-[APOSTAR / NO APOSTAR / ESPERAR]
-[Una oración explicando el veredicto.]
+VEREDICTO DEL ANALISTA:
+[FAVORABLE / DESFAVORABLE / PENDIENTE DE INFORMACIÓN]
+[Una oración. Si el favorito por ELO va perdiendo por mucho,
+di DESFAVORABLE aunque el edge sea alto.]
 
 CONFIANZA: [ALTA / MEDIA / BAJA]
 
-IMPORTANTE: Responde en máximo 200 palabras total. Sin texto adicional fuera del formato.
+IMPORTANTE: Responde en máximo 200 palabras. Sin texto adicional fuera del formato.
 """
 
 

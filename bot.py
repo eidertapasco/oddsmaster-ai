@@ -53,6 +53,9 @@ logger = logging.getLogger(__name__)
 
 # 3. ACTUALIZA la función start() para guardar el chat_id
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    
+    from version import version_completa
+    
     user    = update.effective_user.first_name
     chat_id = update.effective_chat.id
 
@@ -62,7 +65,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
         f"👋 ¡Hola, {user}!\n\n"
-        f"🏀🎾 Bienvenido a OddsMaster AI\n\n"
+        f"🏀🎾 Bienvenido a {version_completa()}\n\n"
         f"Comandos disponibles:\n"
         f"/start     — Este mensaje\n"
         f"/partidos  — Partidos en vivo\n"
