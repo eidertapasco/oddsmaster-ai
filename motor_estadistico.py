@@ -158,7 +158,10 @@ def analizar_partido(
     cuota_local: float,
     cuota_visitante: float,
     deporte: str = "basketball",
-    bankroll: float = 100
+    bankroll: float = 100,
+    puntos_local = None,
+    puntos_visitante = None,
+    periodo: int = 0
 ) -> dict:
     """
     Función principal — recibe un partido con sus cuotas
@@ -231,7 +234,11 @@ def analizar_partido(
         "value_bets":       value_bets,
         "hay_valor":        len(value_bets) > 0,
         "deporte":          deporte,
-        "timestamp":        datetime.now().strftime("%H:%M")
+        "timestamp":        datetime.now().strftime("%H:%M"),
+        "puntos_local":     puntos_local,
+        "puntos_visitante": puntos_visitante,
+        "periodo":          periodo,
+        "en_vivo":          puntos_local is not None
     }
 
 
